@@ -1,0 +1,96 @@
+<html>
+<head>
+    <title>Web Camera App</title>
+    <script src="https://unpkg.com/react/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"></link>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="root" class="flex justify-center items-center h-screen"></div>
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        const CameraApp = () => {
+            const videoRef = useRef(null);
+            const canvasRef = useRef(null);
+            const [isRecording, setIsRecording] = useState(false);
+            const [mediaRecorder, setMediaRecorder] = useState(null);
+            const [recordedChunks, setRecordedChunks] = useState([]);
+
+            useEffect(() => {
+                navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                    .then(stream => {
+                        videoRef.current.srcObject = stream;
+                        const recorder = new MediaRecorder(stream);
+                        recorder.ondataavailable = event => {
+                            if (event.data.size > 0) {
+                                setRecordedChunks(prev => [...prev, event.data]);
+                            }
+                        };
+                        setMediaRecorder(recorder);
+                    })
+                    .catch(err => console.error("Error accessing media devices.", err));
+            }, []);
+
+            const takePhoto = () => {
+                const context = canvasRef.current.getContext('2d');
+                context.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
+                const imageData = canvasRef.current.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = imageData;
+                link.download = 'photo.png';
+                link.click();
+            };
+
+            const startRecording = () => {
+                setIsRecording(true);
+                mediaRecorder.start();
+            };
+
+            const stopRecording = () => {
+                setIsRecording(false);
+                mediaRecorder.stop();
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'video/MP4' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'video.mp4';
+                    link.click();
+                    setRecordedChunks([]);
+                };
+            };
+
+            return (
+                <div className="bg-white p-6 rounded-lg shadow-lg">
+                    <video ref={videoRef} autoPlay className="w-full rounded-lg mb-4"></video>
+                    <canvas ref={canvasRef} width="640" height="480" className="hidden"></canvas>
+                    <div className="flex justify-between">
+                        <button onClick={takePhoto} className="bg-blue-500 text-white px-4 py-2 rounded-lg">
+                            <i className="fas fa-camera"></i> Take Photo
+                        </button>
+                        {isRecording ? (
+                            <button onClick={stopRecording} className="bg-red-500 text-white px-4 py-2 rounded-lg">
+                                <i className="fas fa-stop"></i> Stop Recording
+                            </button>
+                        ) : (
+                            <button onClick={startRecording} className="bg-green-500 text-white px-4 py-2 rounded-lg">
+                                <i className="fas fa-video"></i> Start Recording
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<CameraApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
